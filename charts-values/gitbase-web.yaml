@@ -1,0 +1,19 @@
+gitbaseWeb:
+  image:
+    tag: v0.3.0
+ingress:
+  enabled: true
+  path: /sql
+  hosts:
+  - ""
+settings:
+  bblfshdServer:
+    address: replicatedcom-bblfshd:9432
+  gitbaseServer:
+    host: replicatedcom-gitbase
+service:
+  # ClusterIP works on Replicated Appliance, but not on GKE,
+  # since it requires NodePort or LoadBalancer in order to define
+  # an Ingress. It seems NodePort makes most sense if
+  # only the Ingres should be exposed publicly.
+  type: NodePort

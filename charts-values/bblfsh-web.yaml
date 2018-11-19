@@ -1,0 +1,14 @@
+image:
+  tag: v0.3.0
+settings:
+  serverAddr: replicatedcom-bblfshd:9432
+ingress:
+  enabled: true
+  path: /parse
+  hosts:
+  - ""
+service:
+  # ClusterIP works on Replicated Appliance, but not on GKE,
+  # since it requires NodePort or LoadBalancer in order to define
+  # an Ingress.
+  type: NodePort

@@ -1,0 +1,95 @@
+---
+# kind: replicated
+# apiVersion: v2
+replicated_api_version: 2.9.2
+name: source{d} Engine
+version: ""
+release_notes: ""
+console_support_markdown: ""
+properties:
+  app_url: http://{{repl ConfigOption "hostname" }}
+  logo_url: ""
+  console_title: source{d} Engine
+  bypass_local_registry: false
+  shell_alias: ""
+identity:
+  enabled: ""
+  provisioner: ""
+  sources: []
+state:
+  ready: null
+backup:
+  enabled: ""
+  hidden: ""
+  pause_all: false
+  pause_containers: "false"
+  exclude_registry_data: ""
+  disable_deduplication: ""
+  script: ""
+  restore_script: ""
+  kubernetes:
+    pvc_names: []
+  swarm:
+    volumes: []
+  strategies: []
+monitors:
+  cpuacct: []
+  memory: []
+  custom: []
+host_requirements:
+  replicated_version: '>=2.9.2'
+cmds: []
+config:
+- name: hostname
+  title: Hostname
+  description: Ensure this domain name is routable on your network.
+  test_proc: null
+  when: ""
+  filters: []
+  items:
+  - name: hostname
+    title: Hostname
+    help_text: ""
+    recommended: false
+    default: ""
+    value: '{{repl ConsoleSetting "tls.hostname" }}'
+    multi_value: []
+    default_cmd: null
+    value_cmd: null
+    data_cmd: null
+    readonly: false
+    write_once: false
+    when: ""
+    type: text
+    multiple: false
+    hidden: false
+    affix: ""
+    props: {}
+    required: false
+    test_proc:
+      display_name: Check DNS
+      command: resolve_host
+      results: []
+      timeout: 0
+      arg_fields: []
+      args: []
+      run_on_save: ""
+    is_excluded_from_support: false
+    filters: []
+    items: []
+admin_commands: []
+custom_metrics: []
+graphite:
+  port: 0
+statsd:
+  port: 0
+images:
+- source: public
+  name: k8s.gcr.io/redis
+  tag: e2e
+- source: public
+  name: gcr.io/google_samples/gb-redisslave
+  tag: v1
+- source: public
+  name: gcr.io/google-samples/gb-frontend
+  tag: v4

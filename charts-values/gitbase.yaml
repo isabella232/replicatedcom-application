@@ -1,0 +1,5 @@
+image:
+  tag: v0.17.1
+#TODO(smola) is this needed? or injected by replicated.com?
+storage:
+  class: "default"

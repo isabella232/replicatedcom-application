@@ -1,0 +1,559 @@
+---
+# kind: replicated
+# apiVersion: v2
+replicated_api_version: 2.9.2
+name: source{d} Engine
+version: ""
+release_notes: ""
+console_support_markdown: ""
+properties:
+  app_url: http://{{repl ConfigOption "hostname" }}
+  logo_url: ""
+  console_title: source{d} Engine
+  bypass_local_registry: false
+  shell_alias: ""
+identity:
+  enabled: ""
+  provisioner: ""
+  sources: []
+state:
+  ready: null
+backup:
+  enabled: ""
+  hidden: ""
+  pause_all: false
+  pause_containers: "false"
+  exclude_registry_data: ""
+  disable_deduplication: ""
+  script: ""
+  restore_script: ""
+  kubernetes:
+    pvc_names: []
+  swarm:
+    volumes: []
+  strategies: []
+monitors:
+  cpuacct: []
+  memory: []
+  custom: []
+host_requirements:
+  replicated_version: '>=2.9.2'
+cmds: []
+config:
+- name: hostname
+  title: Hostname
+  description: Ensure this domain name is routable on your network.
+  test_proc: null
+  when: ""
+  filters: []
+  items:
+  - name: hostname
+    title: Hostname
+    help_text: ""
+    recommended: false
+    default: ""
+    value: '{{repl ConsoleSetting "tls.hostname" }}'
+    multi_value: []
+    default_cmd: null
+    value_cmd: null
+    data_cmd: null
+    readonly: false
+    write_once: false
+    when: ""
+    type: text
+    multiple: false
+    hidden: false
+    affix: ""
+    props: {}
+    required: false
+    test_proc:
+      display_name: Check DNS
+      command: resolve_host
+      results: []
+      timeout: 0
+      arg_fields: []
+      args: []
+      run_on_save: ""
+    is_excluded_from_support: false
+    filters: []
+    items: []
+admin_commands: []
+custom_metrics: []
+graphite:
+  port: 0
+statsd:
+  port: 0
+images:
+- source: public
+  name: k8s.gcr.io/redis
+  tag: e2e
+- source: public
+  name: gcr.io/google_samples/gb-redisslave
+  tag: v1
+- source: public
+  name: gcr.io/google-samples/gb-frontend
+  tag: v4
+---
+# kind: scheduler-kubernetes
+# Source: bblfshd/templates/install-drivers-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replicatedcom-bblfshd-install-drivers
+  labels:
+    chart: "bblfshd-0.2.0"
+data:
+  install-bblfshd-drivers.sh: |
+    bblfshctl driver install bash bblfsh/bash-driver:latest
+    bblfshctl driver install go bblfsh/go-driver:latest
+    bblfshctl driver install java bblfsh/java-driver:latest
+    bblfshctl driver install javascript bblfsh/javascript-driver:latest
+    bblfshctl driver install php bblfsh/php-driver:latest
+    bblfshctl driver install python bblfsh/python-driver:latest
+    bblfshctl driver install ruby bblfsh/ruby-driver:latest
+    bblfshctl driver install typescript bblfsh/typescript-driver:latest
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfshd/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: replicatedcom-bblfshd
+  labels:
+    app: bblfshd
+    chart: bblfshd-0.2.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9432
+      targetPort: 9432
+      protocol: TCP
+      name: bblfshd
+  selector:
+    app: bblfshd
+    release: replicatedcom
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfshd/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: replicatedcom-bblfshd
+  labels:
+    app: bblfshd
+    chart: bblfshd-0.2.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      # This is to upgrade the deployment if configmap changes
+      annotations:
+        checksum/config: b77ae0bdfdb2178ddb83835ffae5a68ae28ba40ef1154317a309d456f841d7c0
+      labels:
+        app: bblfshd
+        release: replicatedcom
+    spec:
+      volumes:
+        - configMap:
+            name: replicatedcom-bblfshd-install-drivers
+            items:
+            - key: install-bblfshd-drivers.sh
+              path: install-bblfshd-drivers.sh
+          name: install-bblfshd-drivers-volume
+      containers:
+        - name: bblfshd
+          image: "bblfsh/bblfshd:v2.9.1"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: install-bblfshd-drivers-volume
+              mountPath: /opt/install-bblfshd-drivers.sh
+              subPath: install-bblfshd-drivers.sh
+          lifecycle:
+            postStart:
+              exec:
+                command: [ "sh", "/opt/install-bblfshd-drivers.sh" ]
+          ports:
+            - containerPort: 9432
+          livenessProbe:
+            tcpSocket:
+              port: 9432
+          readinessProbe:
+            tcpSocket:
+              port: 9432
+          securityContext:
+            privileged: true
+          resources:
+            {}
+            
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfsh-web/charts/bblfshd-sidecar/templates/install-drivers-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replicatedcom-bblfshd-sidecar-install-drivers
+  labels:
+    chart: "bblfshd-sidecar-0.1.0"
+data:
+  install-bblfshd-drivers.sh: |
+    bblfshctl driver install bash bblfsh/bash-driver:latest
+    bblfshctl driver install go bblfsh/go-driver:latest
+    bblfshctl driver install java bblfsh/java-driver:latest
+    bblfshctl driver install javascript bblfsh/javascript-driver:latest
+    bblfshctl driver install php bblfsh/php-driver:latest
+    bblfshctl driver install python bblfsh/python-driver:latest
+    bblfshctl driver install ruby bblfsh/ruby-driver:latest
+    bblfshctl driver install typescript bblfsh/typescript-driver:latest
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfsh-web/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: replicatedcom-bblfsh-web
+  labels:
+    app: replicatedcom-bblfsh-web
+    chart: "bblfsh-web-0.7.0"
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: bblfsh-web
+    release: replicatedcom
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfsh-web/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: replicatedcom-bblfsh-web
+  labels:
+    chart: "bblfsh-web-0.7.0"
+    app: bblfsh-web
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bblfsh-web
+      release: replicatedcom
+  template:
+    metadata:
+      labels:
+        app: bblfsh-web
+        release: replicatedcom
+    spec:
+      volumes:
+      containers:
+      - name: bblfsh-web
+        image: "bblfsh/web:v0.3.0"
+        imagePullPolicy: IfNotPresent
+        args:
+        - -bblfsh-addr=replicatedcom-bblfshd:9432
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        resources:
+          {}
+          
+
+---
+# kind: scheduler-kubernetes
+# Source: bblfsh-web/templates/ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: replicatedcom-bblfsh-web
+  labels:
+    app.kubernetes.io/name: bblfsh-web
+    helm.sh/chart: bblfsh-web-0.7.0
+    app.kubernetes.io/instance: replicatedcom
+    app.kubernetes.io/managed-by: Tiller
+spec:
+  rules:
+    - host: ""
+      http:
+        paths:
+          - path: /parse
+            backend:
+              serviceName: replicatedcom-bblfsh-web
+              servicePort: 80
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase/templates/clone-git-repositories-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replicatedcom-gitbase-clone-git-repositories
+  labels:
+    chart: "gitbase-0.1.0"
+data:
+  clone-git-repositories.sh: |
+    # Quick and dirty way to have the same state in case of multiple replicas
+    # if a certain commit is given per repository
+    set -x
+    apk update
+    apk add git
+    cd /opt/repos
+    if [ ! -d "bblfshd" ]; then
+      git clone https://github.com/bblfsh/bblfshd.git bblfshd
+    fi
+    cd bblfshd
+    git pull
+    git reset --hard HEAD
+    cd ..
+    if [ ! -d "gitbase" ]; then
+      git clone https://github.com/src-d/gitbase.git gitbase
+    fi
+    cd gitbase
+    git pull
+    git reset --hard HEAD
+    cd ..
+    if [ ! -d "gitbase-web" ]; then
+      git clone https://github.com/src-d/gitbase-web.git gitbase-web
+    fi
+    cd gitbase-web
+    git pull
+    git reset --hard HEAD
+    cd ..
+    if [ ! -d "go-git" ]; then
+      git clone https://github.com/src-d/go-git.git go-git
+    fi
+    cd go-git
+    git pull
+    git reset --hard HEAD
+    cd ..
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: replicatedcom-gitbase
+  labels:
+    app: gitbase
+    chart: gitbase-0.1.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+      name: mysql
+  selector:
+    app: gitbase
+    release: replicatedcom
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: replicatedcom-gitbase
+  labels:
+    app: gitbase
+    chart: gitbase-0.1.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  serviceName: replicatedcom-gitbase
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitbase
+      release: replicatedcom
+  volumeClaimTemplates:
+    - metadata:
+        name: gitbase-repos-volume
+      spec:
+        storageClassName: "default"
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: "10Gi"
+  template:
+    metadata:
+      labels:
+        app: gitbase
+        release: replicatedcom
+      # This is to upgrade the deployment if configmap changes
+      annotations:
+        checksum/clone-git-repositories: 44ec8a42cf46440e6cb858969eb4c9f25dc9b363e8af0c6cbc72d08150ec5912 
+    spec:
+      volumes:
+        - configMap:
+            name: replicatedcom-gitbase-clone-git-repositories
+            items:
+            - key: clone-git-repositories.sh
+              path: clone-git-repositories.sh
+          name: clone-git-repositories-volume
+      initContainers:
+        - name: clone-git-repositories
+          image: "srcd/gitbase:v0.17.1"
+          imagePullPolicy: IfNotPresent
+          command: [ 'sh', '/opt/clone-git-repositories.sh' ]
+          volumeMounts:
+            - name: clone-git-repositories-volume
+              mountPath: /opt/clone-git-repositories.sh
+              subPath: clone-git-repositories.sh
+            - name: gitbase-repos-volume
+              mountPath: /opt/repos
+      containers:
+        - name: gitbase
+          image: "srcd/gitbase:v0.17.1"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: gitbase-repos-volume
+              mountPath: /opt/repos
+          env:
+            - name: BBLFSH_ENDPOINT
+              value: "127.0.0.1:9432"
+            - name: GITBASE_USER
+              value: "gitbase"
+            - name: GITBASE_PASSWORD
+              value: ""
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: GITBASE_REPOS
+              value: "/opt/repos"
+          resources:
+            {}
+            
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: replicatedcom-gitbase-web
+  labels:
+    app: gitbase-web
+    chart: gitbase-web-0.3.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: gitbase-web
+    release: replicatedcom
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/deployment.yaml
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: replicatedcom-gitbase-web
+  labels:
+    app: gitbase-web
+    chart: gitbase-web-0.3.0
+    release: replicatedcom
+    heritage: Tiller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitbase-web
+      release: replicatedcom
+  template:
+    metadata:
+      labels:
+        app: gitbase-web
+        release: replicatedcom
+    spec:
+      containers:
+        - name: gitbase-web
+          image: "srcd/gitbase-web:v0.3.0"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "8080"
+            - name: GITBASEPG_ENV
+              value: ""
+            - name: GITBASEPG_DB_CONNECTION
+              value: gitbase@tcp(replicatedcom-gitbase:3306)/none?maxAllowedPacket=4194304
+            - name: GITBASEPG_BBLFSH_SERVER_URL
+              value: "replicatedcom-bblfshd:9432:9432"
+            - name: GITBASEPG_ENV
+              value: "dev"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {}
+            
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: replicatedcom-gitbase-web
+  labels:
+    app.kubernetes.io/name: gitbase-web
+    helm.sh/chart: gitbase-web-0.3.0
+    app.kubernetes.io/instance: replicatedcom
+    app.kubernetes.io/managed-by: Tiller
+spec:
+  rules:
+    - host: ""
+      http:
+        paths:
+          - path: /sql
+            backend:
+              serviceName: replicatedcom-gitbase-web
+              servicePort: 80
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/clone-git-repositories-configmap.yaml
+
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/install-bblfshd-drivers-configmap.yaml
+
+
+---
+# kind: scheduler-kubernetes
+# Source: gitbase-web/templates/statefulset.yaml
+
+
